@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Viewer</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+
+        <h1>API Data</h1>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <!--<th>Data</th>
+                    <th>Parsed Data</th>-->
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in page_data %}
+                <tr id="row-{{ loop.index }}" data-row="{{ row.data }}">
+                    <td>{{ row['url'] }} length: {{ row['data'] | length }}</td>
+                    <td id="td-{{ loop.index }}">
+                    </td>        
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <nav>
+            <ul class="pagination">
+                {% for i in range(1, total_pages + 1) %}
+                <li class="page-item {% if i == page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('index', page=i) }}">{{ i }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </nav>
+    </div>
+
+    <script>
+        function displayData(jsonData, dataTdIdEl) {
+            var table = document.createElement('table');
+            table.className = 'table table-striped'; // Bootstrap class
+
+            // Function to get unique headers from jsonData
+            function getHeaders(jsonData) {
+                var headersSet = new Set();
+                jsonData.forEach(item => {
+                    Object.keys(item).forEach(key => {
+                        headersSet.add(key);
+                    });
+                });
+                return Array.from(headersSet);
+            }
+
+            var headers = getHeaders(jsonData);
+
+            // Create table headers
+            var thead = table.createTHead();
+            var headerRow = thead.insertRow();
+            headers.forEach(headerText => {
+                var th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+
+            // Create table body
+            var tbody = table.createTBody();
+
+            jsonData.forEach(function(row) {
+                var tr = tbody.insertRow();
+                headers.forEach(function(header) {
+                    var td = tr.insertCell();
+                    var value = row[header];
+                    td.textContent = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value;
+                });
+            });
+
+            if (dataTdIdEl) {
+                dataTdIdEl.innerHTML = ''; // Clear existing content
+                dataTdIdEl.appendChild(table);
+            }
+        }
+
+        function copyTextToClipboard(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(function() {
+                    console.log('Async: Copying to clipboard was successful!');
+                }, function(err) {
+                    console.error('Async: Could not copy text: ', err);
+                });
+            } else {
+                // Fallback method
+                var textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // Avoid scrolling to bottom
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.position = "fixed";
+
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+
+                try {
+                    var successful = document.execCommand('copy');
+                    var msg = successful ? 'successful' : 'unsuccessful';
+                    console.log('Fallback: Copying text command was ' + msg);
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+
+                document.body.removeChild(textArea);
+            }
+        }
+        
+        function logTableRows() {
+            var rows = document.querySelectorAll('tbody tr');
+            rows.forEach(function(row, index) {
+                let jsonString = row.getAttribute('data-row');
+                jsonString = jsonString.replace(/'/g, '"'); // Replacing single quotes with double quotes
+                jsonString = jsonString.replace(/True/g, 'true').replace(/False/g, 'false');
+
+                dataTdEl = document.getElementById('td-' + (index + 1));
+                try {
+                    // Directly parse the JSON string without replacing quotes
+                    //console.log('JSON string:', jsonString);
+                    let jsonData = JSON.parse(jsonString);
+                    //console.log('Parsed data:', jsonData);
+
+                    if (jsonData && !Array.isArray(jsonData)) {
+                        //console.log('Not array data:', jsonData);
+                        let jsonData = Object.keys(jsonData).map(key => {
+                            return { key: key, value: jsonData[key] };
+                        });
+                        //console.log('Array data:', jsonData);
+                    }
+
+                    if (!Array.isArray(jsonData)) {
+                        jsonData = [jsonData];
+                    }
+
+                    // Check if jsonData is in the correct format
+                    if (Array.isArray(jsonData)) {
+                        let dataTdId = 'data-' + (index + 1);
+                        displayData(jsonData, dataTdEl);
+                    } else {
+                        // Handle non-array jsonData appropriately
+                        //console.error('jsonData is not an array:', jsonData);
+                    }
+                } catch (e) {
+                    console.log('Not parsed JSON string:');
+                    console.log(jsonString);
+
+                    console.error('Error parsing JSON data: ', e);
+                    if (dataTdEl) {
+                        dataTdEl.innerHTML = ''; // Clear existing content
+
+                        // Truncate jsonString to 200 characters and add "..."
+                        var truncatedString = jsonString.length > 200 ? jsonString.substring(0, 200) + "..." : jsonString;
+
+                        // Create a span element for the truncated string
+                        var span = document.createElement('span');
+                        span.textContent = truncatedString;
+                        dataTdEl.appendChild(span);
+
+                        // Create a copy to clipboard button
+                        var copyBtn = document.createElement('button');
+                        copyBtn.textContent = 'Copy to Clipboard';
+
+                        copyBtn.onclick = function() {
+                            copyTextToClipboard(jsonString);
+
+                            // Change background color to red when clicked
+                            copyBtn.style.backgroundColor = 'red';
+                        };
+                        
+                        dataTdEl.appendChild(copyBtn);
+                    }
+                    
+                }
+            });
+        }
+
+        window.onload = function() {
+            //displayData(jsonData);
+            logTableRows();
+        };
+    </script>
+    
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+.vscode
+.git
+api_data.db
+__pycache__
+run.wsgi
